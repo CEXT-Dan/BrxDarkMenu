@@ -271,6 +271,7 @@ public:
             }
         }
     }
+
     static LRESULT CALLBACK MenuWindowHookProc(int nCode, WPARAM wParam, LPARAM lParam)
     {
         if (nCode >= 0 && lParam != 0)
