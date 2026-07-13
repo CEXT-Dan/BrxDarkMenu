@@ -1,0 +1,43 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.7.11925.98 stable
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BrxDarkMenu25", "BrxDarkMenu\BrxDarkMenu25.vcxproj", "{02331311-54FE-4846-B3CA-17D45395D413}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BrxDarkMenu26", "BrxDarkMenu\BrxDarkMenu26.vcxproj", "{C39440DF-D603-45B3-AA81-8259E925F114}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BrxDarkMenu27", "BrxDarkMenu\BrxDarkMenu27.vcxproj", "{CBDCF2CB-008C-4552-ACB6-A5D927811A51}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BrxDarkMenu24", "BrxDarkMenu\BrxDarkMenu24.vcxproj", "{D4B03E9E-905B-441B-A7CE-5F80D5F36FB9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{02331311-54FE-4846-B3CA-17D45395D413}.Debug|x64.ActiveCfg = Debug|x64
+		{02331311-54FE-4846-B3CA-17D45395D413}.Debug|x64.Build.0 = Debug|x64
+		{02331311-54FE-4846-B3CA-17D45395D413}.Release|x64.ActiveCfg = Release|x64
+		{02331311-54FE-4846-B3CA-17D45395D413}.Release|x64.Build.0 = Release|x64
+		{C39440DF-D603-45B3-AA81-8259E925F114}.Debug|x64.ActiveCfg = Debug|x64
+		{C39440DF-D603-45B3-AA81-8259E925F114}.Debug|x64.Build.0 = Debug|x64
+		{C39440DF-D603-45B3-AA81-8259E925F114}.Release|x64.ActiveCfg = Release|x64
+		{C39440DF-D603-45B3-AA81-8259E925F114}.Release|x64.Build.0 = Release|x64
+		{CBDCF2CB-008C-4552-ACB6-A5D927811A51}.Debug|x64.ActiveCfg = Debug|x64
+		{CBDCF2CB-008C-4552-ACB6-A5D927811A51}.Debug|x64.Build.0 = Debug|x64
+		{CBDCF2CB-008C-4552-ACB6-A5D927811A51}.Release|x64.ActiveCfg = Release|x64
+		{CBDCF2CB-008C-4552-ACB6-A5D927811A51}.Release|x64.Build.0 = Release|x64
+		{D4B03E9E-905B-441B-A7CE-5F80D5F36FB9}.Debug|x64.ActiveCfg = Debug|x64
+		{D4B03E9E-905B-441B-A7CE-5F80D5F36FB9}.Debug|x64.Build.0 = Debug|x64
+		{D4B03E9E-905B-441B-A7CE-5F80D5F36FB9}.Release|x64.ActiveCfg = Release|x64
+		{D4B03E9E-905B-441B-A7CE-5F80D5F36FB9}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {08134B2F-ECE0-4351-89D2-6696DF35462C}
+	EndGlobalSection
+EndGlobal
