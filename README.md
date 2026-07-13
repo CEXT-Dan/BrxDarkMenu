@@ -33,4 +33,4 @@ Contributions are welcome! If you notice an unpatched dialog icon or an unstyled
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for more details.
+This project is licensed under the MIT License.
