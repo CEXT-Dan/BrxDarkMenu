@@ -151,54 +151,56 @@ public:
     static LRESULT CALLBACK DarkMenuBarSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
         UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
     {
-        // Capture core draw and window focus events
-        if (uMsg == WM_NCPAINT || uMsg == WM_NCACTIVATE || uMsg == WM_MENUSELECT ||
-            uMsg == WM_ENTERMENULOOP || uMsg == WM_EXITMENULOOP || uMsg == WM_MOUSEMOVE)
+        switch (uMsg)
         {
-            LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
-            PerformDarkMenuPaint(hWnd);
-            return res;
-        }
-
-        // Intercept mouse glide globally across the bar to wipe hot-track artifacts
-        if (uMsg == WM_NCMOUSEMOVE)
-        {
-            if (wParam == HTMENU)
-            {
-                PerformDarkMenuPaint(hWnd);
-                return 0;
-            }
-        }
-
-        // Keep background solid dark when empty bar areas are clicked
-        if (uMsg == WM_NCLBUTTONDOWN || uMsg == WM_NCLBUTTONDBLCLK)
-        {
-            if (wParam == HTMENU)
+            // Capture core draw and window focus events
+            case WM_NCPAINT:
+            case WM_NCACTIVATE:
+            case WM_MENUSELECT:
+            case WM_ENTERMENULOOP:
+            case WM_EXITMENULOOP:
+            case WM_MOUSEMOVE:
             {
                 LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
                 PerformDarkMenuPaint(hWnd);
                 return res;
             }
-        }
 
-        // Stop Windows from executing the default high-priority light hover overlay loop
-        if (uMsg == WM_SETCURSOR)
-        {
-            if (LOWORD(lParam) == HTMENU)
-            {
-                PerformDarkMenuPaint(hWnd);
-                return TRUE;
-            }
-        }
+            // Intercept mouse glide globally across the bar to wipe hot-track artifacts
+            case WM_NCMOUSEMOVE:
+                if (wParam == HTMENU)
+                {
+                    PerformDarkMenuPaint(hWnd);
+                    return 0;
+                }
+                break;
 
-        if (uMsg == WM_NCHITTEST)
-        {
-            return DefSubclassProc(hWnd, uMsg, wParam, lParam);
-        }
+                // Keep background solid dark when empty bar areas are clicked
+            case WM_NCLBUTTONDOWN:
+            case WM_NCLBUTTONDBLCLK:
+                if (wParam == HTMENU)
+                {
+                    LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
+                    PerformDarkMenuPaint(hWnd);
+                    return res;
+                }
+                break;
 
-        if (uMsg == WM_NCDESTROY)
-        {
-            RemoveWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass);
+                // Stop Windows from executing the default high-priority light hover overlay loop
+            case WM_SETCURSOR:
+                if (LOWORD(lParam) == HTMENU)
+                {
+                    PerformDarkMenuPaint(hWnd);
+                    return TRUE;
+                }
+                break;
+
+            case WM_NCHITTEST:
+                return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+
+            case WM_NCDESTROY:
+                RemoveWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass);
+                break;
         }
 
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
@@ -247,18 +249,15 @@ public:
         {
             // nave cube
             if (className[0] == 'Q' && className[1] == 't')
-            {
                 return;
-            }
 
             BOOL useDarkMode = TRUE;
             ::DwmSetWindowAttribute(hwndTarget, DWMWA_USE_IMMERSIVE_DARK_MODE_I20, &useDarkMode, sizeof(useDarkMode));
 
             HICON hExistingIcon = (HICON)::SendMessage(hwndTarget, WM_GETICON, ICON_SMALL, 0);
             if (hExistingIcon == NULL)
-            {
                 hExistingIcon = (HICON)::GetClassLongPtr(hwndTarget, GCLP_HICONSM);
-            }
+            
             if (hExistingIcon == NULL)
             {
                 ::SetWindowLongPtr(hwndTarget, GWL_STYLE, style | WS_POPUPWINDOW);
@@ -275,10 +274,9 @@ public:
 
             if (pCwprs->message == WM_CREATE)
             {
-                HWND hwndTarget = pCwprs->hwnd;
-                LONG_PTR style = ::GetWindowLongPtr(hwndTarget, GWL_STYLE);
+                LONG_PTR style = ::GetWindowLongPtr(pCwprs->hwnd, GWL_STYLE);
                 if (!(style & WS_CHILD))
-                    tryApplyTheme(hwndTarget, style);
+                    tryApplyTheme(pCwprs->hwnd, style);
             }
         }
         return ::CallNextHookEx(m_hMenuHook, nCode, wParam, lParam);
