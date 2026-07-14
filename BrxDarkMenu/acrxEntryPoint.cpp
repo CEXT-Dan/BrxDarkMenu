@@ -173,8 +173,7 @@ public:
             }
 
             // --- SINGLE BLIT ATOMIC TRANSFER ---
-            BitBlt(hdcScreen, rcMenuBarStrip.left, rcMenuBarStrip.top, stripWidth, stripHeight,
-                hdcMem, 0, 0, SRCCOPY);
+            BitBlt(hdcScreen, rcMenuBarStrip.left, rcMenuBarStrip.top, stripWidth, stripHeight, hdcMem, 0, 0, SRCCOPY);
 
             // --- CLEAN CLEANUP ---
             SelectObject(hdcMem, hBmpOld);
