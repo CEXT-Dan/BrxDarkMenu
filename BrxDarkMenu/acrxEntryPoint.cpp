@@ -25,11 +25,6 @@
 
 constexpr const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_I20 = 20;
 
-enum PreferredAppMode { Default = 0, AllowDark = 1, ForceDark = 2, ForceLight = 3, Max = 4 };
-typedef bool (WINAPI* fnAllowDarkModeForWindow)(HWND hWnd, bool allow);
-typedef PreferredAppMode(WINAPI* fnSetPreferredAppMode)(PreferredAppMode appMode);
-typedef void (WINAPI* fnFlushMenuThemes)();
-
 class BrxDarkMode : public AcRxArxApp
 {
     inline static HHOOK m_hMenuHook = nullptr;
@@ -207,6 +202,11 @@ public:
 
     static void InitializeDarkMenuBar()
     {
+        enum PreferredAppMode { Default = 0, AllowDark = 1, ForceDark = 2, ForceLight = 3, Max = 4 };
+        typedef bool (WINAPI* fnAllowDarkModeForWindow)(HWND hWnd, bool allow);
+        typedef PreferredAppMode(WINAPI* fnSetPreferredAppMode)(PreferredAppMode appMode);
+        typedef void (WINAPI* fnFlushMenuThemes)();
+
         HMODULE hUxTheme = GetModuleHandle(_T("uxtheme.dll"));
         if (!hUxTheme) return;
 
