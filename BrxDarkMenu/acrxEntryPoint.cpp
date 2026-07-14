@@ -21,7 +21,6 @@
 
 #include "StdAfx.h"
 #include "resource.h"
-#include <unordered_set>
 #include "dwmapi.h"
 
 constexpr const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_I20 = 20;
@@ -33,7 +32,6 @@ typedef void (WINAPI* fnFlushMenuThemes)();
 
 class BrxDarkMode : public AcRxArxApp
 {
-    inline static std::unordered_set<HWND> m_winmap;
     inline static HHOOK m_hMenuHook = nullptr;
     inline static HICON hIcon = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(31233));
 public:
@@ -66,7 +64,6 @@ public:
             // there's no need to restore the previous theme 
             RemoveWindowSubclass(hMainWnd, DarkMenuBarSubclassProc, 1);
         }
-        m_winmap.clear();
         return (retCode);
     }
 
@@ -234,49 +231,20 @@ public:
                 // Force a total window repaint to trigger the new paint sequence instantly
                 SetWindowPos(hMainWnd, NULL, 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+                // after acadMainWnd menus are set, switch back to light mode.
+                // don't  FlushMenuThemes();
+                AllowDarkModeForWindow(hMainWnd, false);
             }
         }
     }
 
-    static void InitializeContextMenu(HWND targethWnd, bool dark)
-    {
-        HMODULE hUxTheme = GetModuleHandle(_T("uxtheme.dll"));
-        if (!hUxTheme) return;
-
-        auto SetPreferredAppMode = (fnSetPreferredAppMode)GetProcAddress(hUxTheme, MAKEINTRESOURCEA(135));
-        auto AllowDarkModeForWindow = (fnAllowDarkModeForWindow)GetProcAddress(hUxTheme, MAKEINTRESOURCEA(133));
-        auto FlushMenuThemes = (fnFlushMenuThemes)GetProcAddress(hUxTheme, MAKEINTRESOURCEA(136));
-
-        // Force dropdowns dark using the hidden Win32 APIs
-        if (SetPreferredAppMode && AllowDarkModeForWindow && FlushMenuThemes)
-        {
-
-            auto mode = dark ? PreferredAppMode::ForceDark : PreferredAppMode::ForceLight;
-            SetPreferredAppMode(mode);
-
-            if (targethWnd != NULL)
-            {
-                AllowDarkModeForWindow(targethWnd, true);;
-            }
-        }
-    }
-
-    // This wis an attempt to paint Editor right click context menus correctly 
-    // after acadMainWnd menus are set, switch back to light mode.
     // Also, we can catch title bars here (modal?)
     static void tryApplyTheme(HWND hwndTarget, LONG_PTR style)
     {
         TCHAR className[256];
         if (::GetClassName(hwndTarget, className, 256) > 0)
         {
-            // switch back, but don't flush the menus
-            static bool calledOnce = false;
-            if (!calledOnce)
-            {
-                calledOnce = true;
-                InitializeContextMenu(hwndTarget, false);
-            }
-
             // nave cube
             if (className[0] == 'Q' && className[1] == 't')
             {
@@ -309,12 +277,8 @@ public:
             {
                 HWND hwndTarget = pCwprs->hwnd;
                 LONG_PTR style = ::GetWindowLongPtr(hwndTarget, GWL_STYLE);
-
-                if (!(style & WS_CHILD) && !m_winmap.contains(hwndTarget))
-                {
-                    m_winmap.insert(hwndTarget);
+                if (!(style & WS_CHILD))
                     tryApplyTheme(hwndTarget, style);
-                }
             }
         }
         return ::CallNextHookEx(m_hMenuHook, nCode, wParam, lParam);
