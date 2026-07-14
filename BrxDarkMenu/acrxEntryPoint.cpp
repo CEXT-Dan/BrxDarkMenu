@@ -25,6 +25,8 @@
 
 constexpr const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_I20 = 20;
 
+constexpr const UINT_PTR MENU_SUBCLASS_ID = 1;
+
 class BrxDarkMode : public AcRxArxApp
 {
     inline static HHOOK m_hMenuHook = nullptr;
@@ -57,7 +59,7 @@ public:
         {
             // since we call acrxLockApplication, we only get here on app exit
             // there's no need to restore the previous theme 
-            RemoveWindowSubclass(hMainWnd, DarkMenuBarSubclassProc, 1);
+            RemoveWindowSubclass(hMainWnd, DarkMenuBarSubclassProc, MENU_SUBCLASS_ID);
         }
         return (retCode);
     }
@@ -78,10 +80,10 @@ public:
     }
 
     // This just paints over the menubar, flashy eh
-    static void PerformDarkMenuPaint(HWND hTargetWnd)
+    static void PerformDarkMenuPaint(HWND hTargetWnd, int activeHoverIdx)
     {
-        HDC hdc = GetWindowDC(hTargetWnd);
-        if (!hdc)
+        HDC hdcScreen = GetWindowDC(hTargetWnd);
+        if (!hdcScreen)
             return;
 
         MENUBARINFO mbi = { 0 };
@@ -99,25 +101,41 @@ public:
             rcMenuBarStrip.top = mbi.rcBar.top - rcWindow.top;
             rcMenuBarStrip.bottom = mbi.rcBar.bottom - rcWindow.top;
 
-            // Applying your perfect layout alignment offsets
             rcMenuBarStrip.top += 0;
             rcMenuBarStrip.bottom += 2;
 
-            // 1. Draw solid dark background canvas
-            HBRUSH hDarkBrush = CreateSolidBrush(RGB(30, 30, 30));
-            FillRect(hdc, &rcMenuBarStrip, hDarkBrush);
+            int stripWidth = rcMenuBarStrip.right - rcMenuBarStrip.left;
+            int stripHeight = rcMenuBarStrip.bottom - rcMenuBarStrip.top;
+
+            if (stripWidth <= 0 || stripHeight <= 0)
+            {
+                ReleaseDC(hTargetWnd, hdcScreen);
+                return;
+            }
+
+            // --- DOUBLE BUFFERING SETUP ---
+            HDC hdcMem = CreateCompatibleDC(hdcScreen);
+            HBITMAP hBmpMem = CreateCompatibleBitmap(hdcScreen, stripWidth, stripHeight);
+            HBITMAP hBmpOld = (HBITMAP)SelectObject(hdcMem, hBmpMem);
+
+            // --- BASE CANVAS ---
+            RECT rcMemStrip = { 0, 0, stripWidth, stripHeight };
+            HBRUSH hDarkBrush = CreateSolidBrush(RGB(30, 30, 30)); // Base Dark Canvas
+            FillRect(hdcMem, &rcMemStrip, hDarkBrush);
             DeleteObject(hDarkBrush);
 
-            // 2. Re-render structural strings centered over their true hit-test targets
+            // --- RENDER STRUCTURAL ELEMENTS & HOVER TILES ---
             HMENU hMenu = GetMenu(hTargetWnd);
             if (hMenu)
             {
                 int count = GetMenuItemCount(hMenu);
-                SetBkMode(hdc, TRANSPARENT);
-                SetTextColor(hdc, RGB(240, 240, 240)); // Clean Off-White
+                SetBkMode(hdcMem, TRANSPARENT);
 
                 HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-                HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
+                HFONT hOldFont = (HFONT)SelectObject(hdcMem, hFont);
+
+                // Create selection highlighting tools
+                HBRUSH hHoverBrush = CreateSolidBrush(RGB(50, 50, 50)); // Sleek grey highlight accent
 
                 for (int i = 0; i < count; i++)
                 {
@@ -130,62 +148,161 @@ public:
                     if (GetMenuItemRect(hTargetWnd, hMenu, i, &rcItemScreen))
                     {
                         RECT rcTextSlot;
-                        rcTextSlot.left = rcItemScreen.left - rcWindow.left;
-                        rcTextSlot.top = rcMenuBarStrip.top;
-                        rcTextSlot.right = rcItemScreen.right - rcWindow.left;
-                        rcTextSlot.bottom = rcMenuBarStrip.bottom;
-                        DrawText(hdc, szMenuText, -1, &rcTextSlot, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        rcTextSlot.left = (rcItemScreen.left - rcWindow.left) - rcMenuBarStrip.left;
+                        rcTextSlot.top = 0;
+                        rcTextSlot.right = (rcItemScreen.right - rcWindow.left) - rcMenuBarStrip.left;
+                        rcTextSlot.bottom = stripHeight;
+
+                        // If this item is being hovered or clicked, paint the highlight background tile first!
+                        if (i == activeHoverIdx)
+                        {
+                            FillRect(hdcMem, &rcTextSlot, hHoverBrush);
+                            SetTextColor(hdcMem, RGB(255, 255, 255)); // Bright White text for highlighted item
+                        }
+                        else
+                        {
+                            SetTextColor(hdcMem, RGB(210, 210, 210)); // Soft Off-White for neutral items
+                        }
+
+                        DrawText(hdcMem, szMenuText, -1, &rcTextSlot, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                     }
                 }
-                SelectObject(hdc, hOldFont);
+
+                DeleteObject(hHoverBrush);
+                SelectObject(hdcMem, hOldFont);
             }
+
+            // --- SINGLE BLIT ATOMIC TRANSFER ---
+            BitBlt(hdcScreen, rcMenuBarStrip.left, rcMenuBarStrip.top, stripWidth, stripHeight,
+                hdcMem, 0, 0, SRCCOPY);
+
+            // --- CLEAN CLEANUP ---
+            SelectObject(hdcMem, hBmpOld);
+            DeleteObject(hBmpMem);
+            DeleteDC(hdcMem);
         }
-        ReleaseDC(hTargetWnd, hdc);
+        ReleaseDC(hTargetWnd, hdcScreen);
     }
 
     static LRESULT CALLBACK DarkMenuBarSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
         UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
     {
+        // dwRefData will store our currently hovered menu item index.
+        // We treat -1 as "no item hovered".
+        int currentHoverIdx = (int)dwRefData;
+
         switch (uMsg)
         {
-            // Capture core draw and window focus events
+            case WM_ERASEBKGND:
+                return TRUE;
+
             case WM_NCPAINT:
             case WM_NCACTIVATE:
-            case WM_MENUSELECT:
-            case WM_ENTERMENULOOP:
-            case WM_EXITMENULOOP:
-            case WM_MOUSEMOVE:
             {
                 LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
-                PerformDarkMenuPaint(hWnd);
+                // We pass the hover index down to the paint system
+                PerformDarkMenuPaint(hWnd, currentHoverIdx);
                 return res;
             }
 
-            // Intercept mouse glide globally across the bar to wipe hot-track artifacts
             case WM_NCMOUSEMOVE:
                 if (wParam == HTMENU)
                 {
-                    PerformDarkMenuPaint(hWnd);
+                    // Track mouse coordinates to find out which item we are hovering over
+                    POINT pt;
+                    GetCursorPos(&pt);
+
+                    HMENU hMenu = GetMenu(hWnd);
+                    int count = GetMenuItemCount(hMenu);
+                    int newHoverIdx = -1;
+
+                    for (int i = 0; i < count; i++)
+                    {
+                        RECT rcItem;
+                        if (GetMenuItemRect(hWnd, hMenu, i, &rcItem))
+                        {
+                            if (PtInRect(&rcItem, pt))
+                            {
+                                newHoverIdx = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Only repaint if the hover target actually shifted to save CPU cycles
+                    if (newHoverIdx != currentHoverIdx)
+                    {
+                        SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)newHoverIdx);
+                        PerformDarkMenuPaint(hWnd, newHoverIdx);
+                    }
                     return 0;
                 }
                 break;
 
-                // Keep background solid dark when empty bar areas are clicked
+            case WM_NCMOUSELEAVE:
+            case WM_MOUSELEAVE:
+                if (currentHoverIdx != -1)
+                {
+                    SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
+                    PerformDarkMenuPaint(hWnd, -1);
+                }
+                break;
+
+            case WM_MENUSELECT:
+            {
+                UINT uItem = (UINT)LOWORD(wParam);
+                UINT uFlags = (UINT)HIWORD(wParam);
+                HMENU hMenu = (HMENU)lParam;
+
+                if (!(uFlags & MF_SYSMENU) && hMenu == GetMenu(hWnd))
+                {
+                    int activeIdx = -1;
+                    int count = GetMenuItemCount(hMenu);
+                    for (int i = 0; i < count; i++)
+                    {
+                        if (GetSubMenu(hMenu, i) == (HMENU)uItem || i == (int)uItem)
+                        {
+                            activeIdx = i;
+                            break;
+                        }
+                    }
+                    if (activeIdx != -1)
+                    {
+                        SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)activeIdx);
+                        PerformDarkMenuPaint(hWnd, activeIdx);
+                    }
+                }
+                return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+            }
+
+            case WM_ENTERMENULOOP:
+                PerformDarkMenuPaint(hWnd, currentHoverIdx);
+                return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+
+            case WM_EXITMENULOOP:
+                SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
+                PerformDarkMenuPaint(hWnd, -1);
+                return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+
             case WM_NCLBUTTONDOWN:
             case WM_NCLBUTTONDBLCLK:
                 if (wParam == HTMENU)
                 {
+                    PerformDarkMenuPaint(hWnd, currentHoverIdx);
                     LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
-                    PerformDarkMenuPaint(hWnd);
+                    PerformDarkMenuPaint(hWnd, currentHoverIdx);
                     return res;
                 }
                 break;
 
-                // Stop Windows from executing the default high-priority light hover overlay loop
             case WM_SETCURSOR:
                 if (LOWORD(lParam) == HTMENU)
                 {
-                    PerformDarkMenuPaint(hWnd);
+                    // Trigger tracking so WM_NCMOUSELEAVE fires properly when leaving the NC area
+                    TRACKMOUSEEVENT tme = { sizeof(TRACKMOUSEEVENT), TME_LEAVE | TME_NONCLIENT, hWnd, HOVER_DEFAULT };
+                    TrackMouseEvent(&tme);
+
+                    PerformDarkMenuPaint(hWnd, currentHoverIdx);
                     return TRUE;
                 }
                 break;
@@ -227,7 +344,7 @@ public:
 
                 // Inject the window subclass hook to fix the top horizontal menu strip
                 // The parameter '1' is a unique Identifier for this specific subclass hook
-                SetWindowSubclass(hMainWnd, DarkMenuBarSubclassProc, 1, 0);
+                SetWindowSubclass(hMainWnd, DarkMenuBarSubclassProc, MENU_SUBCLASS_ID , (DWORD_PTR)-1);
 
                 // Force a total window repaint to trigger the new paint sequence instantly
                 SetWindowPos(hMainWnd, NULL, 0, 0, 0, 0,
@@ -256,7 +373,7 @@ public:
             HICON hExistingIcon = (HICON)::SendMessage(hwndTarget, WM_GETICON, ICON_SMALL, 0);
             if (hExistingIcon == NULL)
                 hExistingIcon = (HICON)::GetClassLongPtr(hwndTarget, GCLP_HICONSM);
-            
+
             if (hExistingIcon == NULL)
             {
                 ::SetWindowLongPtr(hwndTarget, GWL_STYLE, style | WS_POPUPWINDOW);
