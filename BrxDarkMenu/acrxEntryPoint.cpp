@@ -43,7 +43,7 @@ public:
         AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
         acrxLockApplication(pkt);
         setTitleThemeDark(adsw_acadMainWnd());
-        InstallContextMenuHook();
+        InstallThemeHook();
         InitializeDarkMenuBar();
         return (retCode);
     }
@@ -202,7 +202,6 @@ public:
                 RemoveWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass);
                 break;
         }
-
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
 
@@ -241,7 +240,7 @@ public:
         }
     }
 
-    // Also, we can catch title bars here (modal?)
+    // Set dialogs (model) with a dark title bar and apply icon
     static void tryApplyTheme(HWND hwndTarget, LONG_PTR style)
     {
         TCHAR className[256];
@@ -282,7 +281,7 @@ public:
         return ::CallNextHookEx(m_hMenuHook, nCode, wParam, lParam);
     }
 
-    void InstallContextMenuHook()
+    void InstallThemeHook()
     {
         m_hMenuHook = SetWindowsHookEx(WH_CALLWNDPROCRET, MenuWindowHookProc, NULL, GetCurrentThreadId());
     }
