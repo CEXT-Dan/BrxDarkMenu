@@ -333,7 +333,6 @@ public:
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
 
-
     static void InitializeDarkMenuBar()
     {
         enum PreferredAppMode { Default = 0, AllowDark = 1, ForceDark = 2, ForceLight = 3, Max = 4 };
@@ -361,7 +360,7 @@ public:
 
                 // Inject the window subclass hook to fix the top horizontal menu strip
                 // The parameter '1' is a unique Identifier for this specific subclass hook
-                SetWindowSubclass(hMainWnd, DarkMenuBarSubclassProc, MENU_SUBCLASS_ID , (DWORD_PTR)-1);
+                SetWindowSubclass(hMainWnd, DarkMenuBarSubclassProc, MENU_SUBCLASS_ID, (DWORD_PTR)-1);
 
                 // Force a total window repaint to trigger the new paint sequence instantly
                 SetWindowPos(hMainWnd, NULL, 0, 0, 0, 0,
