@@ -262,7 +262,7 @@ public:
     }
 
     // This wis an attempt to paint Editor right click context menus correctly 
-    // it's a side effect of 'DarkMain' in that they are white 
+    // after acadMainWnd menus are set, switch back to light mode.
     // Also, we can catch title bars here (modal?)
     static void tryApplyTheme(HWND hwndTarget, LONG_PTR style)
     {
