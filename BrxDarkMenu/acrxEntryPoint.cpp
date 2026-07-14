@@ -23,8 +23,8 @@
 #include "resource.h"
 #include "dwmapi.h"
 
-constexpr const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_I20 = 20;
-
+constexpr const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_I20 = 20; //dark
+constexpr const UINT_PTR MENU_LEAVE_TIMER_ID = 4242; // Unique timer ID for mouse-leave polling
 constexpr const UINT_PTR MENU_SUBCLASS_ID = 1;
 
 class BrxDarkMode : public AcRxArxApp
@@ -187,8 +187,6 @@ public:
     static LRESULT CALLBACK DarkMenuBarSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
         UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
     {
-        // dwRefData will store our currently hovered menu item index.
-        // We treat -1 as "no item hovered".
         int currentHoverIdx = (int)dwRefData;
 
         switch (uMsg)
@@ -200,7 +198,6 @@ public:
             case WM_NCACTIVATE:
             {
                 LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
-                // We pass the hover index down to the paint system
                 PerformDarkMenuPaint(hWnd, currentHoverIdx);
                 return res;
             }
@@ -208,7 +205,6 @@ public:
             case WM_NCMOUSEMOVE:
                 if (wParam == HTMENU)
                 {
-                    // Track mouse coordinates to find out which item we are hovering over
                     POINT pt;
                     GetCursorPos(&pt);
 
@@ -229,22 +225,52 @@ public:
                         }
                     }
 
-                    // Only repaint if the hover target actually shifted to save CPU cycles
+                    // If the hover state shifted, update layout variables
                     if (newHoverIdx != currentHoverIdx)
                     {
                         SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)newHoverIdx);
                         PerformDarkMenuPaint(hWnd, newHoverIdx);
                     }
+
+                    // Start a high-frequency polling timer as an absolute safety fallback.
+                    // This captures quick whip-offs that the raw OS event queue drops.
+                    SetTimer(hWnd, MENU_LEAVE_TIMER_ID, 15, NULL);
+
                     return 0;
                 }
                 break;
 
+                // Catch the explicit Non-Client Mouse Leave message
             case WM_NCMOUSELEAVE:
-            case WM_MOUSELEAVE:
                 if (currentHoverIdx != -1)
                 {
+                    KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
                     SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
                     PerformDarkMenuPaint(hWnd, -1);
+                }
+                break;
+
+            case WM_TIMER:
+                if (wParam == MENU_LEAVE_TIMER_ID)
+                {
+                    POINT pt;
+                    GetCursorPos(&pt);
+
+                    // Run a HitTest to check if the mouse is still hovering over the menu area
+                    LRESULT hitTest = DefSubclassProc(hWnd, WM_NCHITTEST, 0, MAKELPARAM(pt.x, pt.y));
+
+                    if (hitTest != HTMENU)
+                    {
+                        // The mouse is gone! Turn off the timer loop immediately to save CPU cycles
+                        KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
+
+                        if (currentHoverIdx != -1)
+                        {
+                            SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
+                            PerformDarkMenuPaint(hWnd, -1);
+                        }
+                    }
+                    return 0;
                 }
                 break;
 
@@ -280,25 +306,14 @@ public:
                 return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 
             case WM_EXITMENULOOP:
+                KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
                 SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
                 PerformDarkMenuPaint(hWnd, -1);
                 return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 
-            case WM_NCLBUTTONDOWN:
-            case WM_NCLBUTTONDBLCLK:
-                if (wParam == HTMENU)
-                {
-                    PerformDarkMenuPaint(hWnd, currentHoverIdx);
-                    LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
-                    PerformDarkMenuPaint(hWnd, currentHoverIdx);
-                    return res;
-                }
-                break;
-
             case WM_SETCURSOR:
                 if (LOWORD(lParam) == HTMENU)
                 {
-                    // Trigger tracking so WM_NCMOUSELEAVE fires properly when leaving the NC area
                     TRACKMOUSEEVENT tme = { sizeof(TRACKMOUSEEVENT), TME_LEAVE | TME_NONCLIENT, hWnd, HOVER_DEFAULT };
                     TrackMouseEvent(&tme);
 
@@ -311,11 +326,13 @@ public:
                 return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 
             case WM_NCDESTROY:
+                KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
                 RemoveWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass);
                 break;
         }
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
+
 
     static void InitializeDarkMenuBar()
     {
