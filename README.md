@@ -5,6 +5,7 @@ BrxDarkMenu is a lightweight utility designed to enhance the native dark mode ex
 ## Preview
 
 ![BricsCAD Dark Theme Helper](./Resources/dark1.png)
+![BricsCAD Dark Theme Helper](./Resources/dark2.png)
 
 ## Core Features
 
