@@ -166,7 +166,7 @@ public:
                     TCHAR szMenuText[128];
                     GetMenuString(hMenu, i, szMenuText, 128, MF_BYPOSITION);
 
-                    if (_tcslen(szMenuText) == 0) 
+                    if (_tcslen(szMenuText) == 0)
                         continue;
 
                     RECT rcItemScreen{};
@@ -354,7 +354,6 @@ public:
                 {
                     TRACKMOUSEEVENT tme = { sizeof(TRACKMOUSEEVENT), TME_LEAVE | TME_NONCLIENT, hWnd, HOVER_DEFAULT };
                     TrackMouseEvent(&tme);
-
                     PerformDarkMenuPaint(hWnd, currentHoverIdx);
                     return TRUE;
                 }
