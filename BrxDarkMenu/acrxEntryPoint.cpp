@@ -31,7 +31,15 @@ class BrxDarkMode : public AcRxArxApp
 {
     inline static HHOOK m_hMenuHook = nullptr;
     inline static HICON m_hIcon = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(31233));
-    inline static HICON m_hIconMenu = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(32000));
+    inline static HICON m_hIconMenu = (HICON)::LoadImage(
+        AfxGetInstanceHandle(),
+        MAKEINTRESOURCE(32000),
+        IMAGE_ICON,
+        ::GetSystemMetrics(SM_CXSMICON),
+        ::GetSystemMetrics(SM_CYSMICON),
+        LR_DEFAULTCOLOR | LR_SHARED
+    );
+
 public:
     BrxDarkMode() : AcRxArxApp()
     {}
@@ -92,6 +100,9 @@ public:
 
         if (GetMenuBarInfo(hTargetWnd, OBJID_MENU, 0, &mbi))
         {
+            // Get the active DPI of the target window context
+            UINT dpi = ::GetDpiForWindow(hTargetWnd);
+
             RECT rcWindow{};
             GetWindowRect(hTargetWnd, &rcWindow);
             int winWidth = rcWindow.right - rcWindow.left;
@@ -102,8 +113,10 @@ public:
             rcMenuBarStrip.top = mbi.rcBar.top - rcWindow.top;
             rcMenuBarStrip.bottom = mbi.rcBar.bottom - rcWindow.top;
 
-            rcMenuBarStrip.top += 0;
-            rcMenuBarStrip.bottom += 2;
+            // --- DPI SCALE MAGIC NUMBERS ---
+            // Scale your physical padding (+2) relative to current display scale
+            int verticalPadding = MulDiv(2, dpi, 96);
+            rcMenuBarStrip.bottom += verticalPadding;
 
             int stripWidth = rcMenuBarStrip.right - rcMenuBarStrip.left;
             int stripHeight = rcMenuBarStrip.bottom - rcMenuBarStrip.top;
@@ -121,7 +134,7 @@ public:
 
             // --- BASE CANVAS ---
             RECT rcMemStrip = { 0, 0, stripWidth, stripHeight };
-            HBRUSH hDarkBrush = CreateSolidBrush(RGB(30, 30, 30)); // Base Dark Canvas
+            HBRUSH hDarkBrush = CreateSolidBrush(RGB(30, 30, 30));
             FillRect(hdcMem, &rcMemStrip, hDarkBrush);
             DeleteObject(hDarkBrush);
 
@@ -133,11 +146,22 @@ public:
                 int count = GetMenuItemCount(hMenu);
                 SetBkMode(hdcMem, TRANSPARENT);
 
-                HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-                HFONT hOldFont = (HFONT)SelectObject(hdcMem, hFont);
+                // --- DPI-AWARE DYNAMIC SYSTEM FONT LOOKUP ---
+                NONCLIENTMETRICS ncm = { 0 };
+                ncm.cbSize = sizeof(NONCLIENTMETRICS);
+                HFONT hFont = NULL;
 
-                // Create selection highlighting tools
-                HBRUSH hHoverBrush = CreateSolidBrush(RGB(50, 50, 50)); // Sleek grey highlight accent
+                if (::SystemParametersInfoForDpi(SPI_GETNONCLIENTMETRICS, sizeof(NONCLIENTMETRICS), &ncm, 0, dpi))
+                {
+                    hFont = CreateFontIndirect(&ncm.lfMenuFont); // Fetches clean, DPI-scaled system menu font
+                }
+                else
+                {
+                    hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT); // Fallback
+                }
+
+                HFONT hOldFont = (HFONT)SelectObject(hdcMem, hFont);
+                HBRUSH hHoverBrush = CreateSolidBrush(RGB(50, 50, 50));
 
                 for (int i = 0; i < count; i++)
                 {
@@ -155,15 +179,14 @@ public:
                         rcTextSlot.right = (rcItemScreen.right - rcWindow.left) - rcMenuBarStrip.left;
                         rcTextSlot.bottom = stripHeight;
 
-                        // If this item is being hovered or clicked, paint the highlight background tile first!
                         if (i == activeHoverIdx)
                         {
                             FillRect(hdcMem, &rcTextSlot, hHoverBrush);
-                            SetTextColor(hdcMem, RGB(255, 255, 255)); // Bright White text for highlighted item
+                            SetTextColor(hdcMem, RGB(255, 255, 255));
                         }
                         else
                         {
-                            SetTextColor(hdcMem, RGB(210, 210, 210)); // Soft Off-White for neutral items
+                            SetTextColor(hdcMem, RGB(210, 210, 210));
                         }
 
                         DrawText(hdcMem, szMenuText, -1, &rcTextSlot, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -172,15 +195,22 @@ public:
 
                 DeleteObject(hHoverBrush);
                 SelectObject(hdcMem, hOldFont);
+
+                // Clean up dynamically generated font handle to prevent resource leaks
+                if (hFont && hFont != GetStockObject(DEFAULT_GUI_FONT))
+                {
+                    DeleteObject(hFont);
+                }
             }
 
             // --- DRAW THE CUSTOM MENU ICON LAST (OVERLAY) ---
-            int iconDim = GetSystemMetrics(SM_CXSMICON) + 2;
-            int iconX = iconDim - 2;
+            int iconDim = ::GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+            int iconX = (iconDim * 2) / 2;
             int iconY = (stripHeight - iconDim) / 2;
+
             if (hMenu && m_hIconMenu)
             {
-                DrawIconEx(hdcMem, iconX, iconY, m_hIconMenu, iconDim, iconDim, 0, NULL, DI_IMAGE | DI_MASK | DI_NOMIRROR);
+                DrawIconEx(hdcMem, iconX, iconY, m_hIconMenu, iconDim, iconDim, 0, NULL, DI_NORMAL);
             }
 
             // --- SINGLE BLIT ATOMIC TRANSFER ---
