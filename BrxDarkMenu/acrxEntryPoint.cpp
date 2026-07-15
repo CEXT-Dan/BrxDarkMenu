@@ -30,7 +30,8 @@ constexpr const UINT_PTR MENU_SUBCLASS_ID = 1;
 class BrxDarkMode : public AcRxArxApp
 {
     inline static HHOOK m_hMenuHook = nullptr;
-    inline static HICON hIcon = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(31233));
+    inline static HICON m_hIcon = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(31233));
+    //inline static HICON m_hIconMenu = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(32000));
 public:
     BrxDarkMode() : AcRxArxApp()
     {}
@@ -124,8 +125,9 @@ public:
             FillRect(hdcMem, &rcMemStrip, hDarkBrush);
             DeleteObject(hDarkBrush);
 
-            // --- RENDER STRUCTURAL ELEMENTS & HOVER TILES ---
             HMENU hMenu = GetMenu(hTargetWnd);
+
+            // --- RENDER STRUCTURAL ELEMENTS & HOVER TILES FIRST ---
             if (hMenu)
             {
                 int count = GetMenuItemCount(hMenu);
@@ -170,6 +172,15 @@ public:
 
                 DeleteObject(hHoverBrush);
                 SelectObject(hdcMem, hOldFont);
+            }
+
+            // --- DRAW THE CUSTOM MENU ICON LAST (OVERLAY) ---
+            int iconDim = GetSystemMetrics(SM_CXSMICON);
+            int iconX = iconDim - 2;
+            int iconY = (stripHeight - iconDim) / 2;
+            if (hMenu && m_hIcon)
+            {
+                DrawIconEx(hdcMem, iconX, iconY, m_hIcon, iconDim, iconDim, 0, NULL, DI_IMAGE | DI_MASK | DI_NOMIRROR);
             }
 
             // --- SINGLE BLIT ATOMIC TRANSFER ---
@@ -392,7 +403,7 @@ public:
             if (hExistingIcon == NULL)
             {
                 ::SetWindowLongPtr(hwndTarget, GWL_STYLE, style | WS_POPUPWINDOW);
-                ::SendMessage(hwndTarget, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+                ::SendMessage(hwndTarget, WM_SETICON, ICON_SMALL, (LPARAM)m_hIcon);
             }
         }
     }
