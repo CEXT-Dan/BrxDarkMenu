@@ -31,7 +31,7 @@ class BrxDarkMode : public AcRxArxApp
 {
     inline static HHOOK m_hMenuHook = nullptr;
     inline static HICON m_hIcon = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(31233));
-    //inline static HICON m_hIconMenu = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(32000));
+    inline static HICON m_hIconMenu = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(32000));
 public:
     BrxDarkMode() : AcRxArxApp()
     {}
@@ -175,12 +175,12 @@ public:
             }
 
             // --- DRAW THE CUSTOM MENU ICON LAST (OVERLAY) ---
-            int iconDim = GetSystemMetrics(SM_CXSMICON);
+            int iconDim = GetSystemMetrics(SM_CXSMICON) + 2;
             int iconX = iconDim - 2;
             int iconY = (stripHeight - iconDim) / 2;
-            if (hMenu && m_hIcon)
+            if (hMenu && m_hIconMenu)
             {
-                DrawIconEx(hdcMem, iconX, iconY, m_hIcon, iconDim, iconDim, 0, NULL, DI_IMAGE | DI_MASK | DI_NOMIRROR);
+                DrawIconEx(hdcMem, iconX, iconY, m_hIconMenu, iconDim, iconDim, 0, NULL, DI_IMAGE | DI_MASK | DI_NOMIRROR);
             }
 
             // --- SINGLE BLIT ATOMIC TRANSFER ---
