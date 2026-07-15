@@ -113,8 +113,7 @@ public:
             rcMenuBarStrip.top = mbi.rcBar.top - rcWindow.top;
             rcMenuBarStrip.bottom = mbi.rcBar.bottom - rcWindow.top;
 
-            // --- DPI SCALE MAGIC NUMBERS ---
-            // Scale your physical padding (+2) relative to current display scale
+            // --- DPI SCALE MAGIC NUMBERS ---e
             int verticalPadding = MulDiv(2, dpi, 96);
             rcMenuBarStrip.bottom += verticalPadding;
 
@@ -138,9 +137,8 @@ public:
             FillRect(hdcMem, &rcMemStrip, hDarkBrush);
             DeleteObject(hDarkBrush);
 
-            HMENU hMenu = GetMenu(hTargetWnd);
-
             // --- RENDER STRUCTURAL ELEMENTS & HOVER TILES FIRST ---
+            HMENU hMenu = GetMenu(hTargetWnd);
             if (hMenu)
             {
                 int count = GetMenuItemCount(hMenu);
@@ -168,7 +166,8 @@ public:
                     TCHAR szMenuText[128];
                     GetMenuString(hMenu, i, szMenuText, 128, MF_BYPOSITION);
 
-                    if (_tcslen(szMenuText) == 0) continue;
+                    if (_tcslen(szMenuText) == 0) 
+                        continue;
 
                     RECT rcItemScreen{};
                     if (GetMenuItemRect(hTargetWnd, hMenu, i, &rcItemScreen))
@@ -196,7 +195,6 @@ public:
                 DeleteObject(hHoverBrush);
                 SelectObject(hdcMem, hOldFont);
 
-                // Clean up dynamically generated font handle to prevent resource leaks
                 if (hFont && hFont != GetStockObject(DEFAULT_GUI_FONT))
                 {
                     DeleteObject(hFont);
