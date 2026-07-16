@@ -81,11 +81,12 @@ public:
 
     static void setTitleThemeDark(HWND hwnd)
     {
-        BOOL USE_DARK_MODE = true;
-        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_I20, &USE_DARK_MODE, sizeof(USE_DARK_MODE));
-        const auto style = GetWindowLong(hwnd, GWL_STYLE);
-        SetWindowLong(hwnd, GWL_STYLE, 0);
-        SetWindowLong(hwnd, GWL_STYLE, style);
+        if (!IsWindow(hwnd))
+            return;
+
+        const BOOL useDarkMode = TRUE;
+        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_I20, &useDarkMode, sizeof(useDarkMode));
+        RedrawWindow(hwnd, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE);
     }
 
     // This just paints over the menubar, flashy eh
@@ -128,14 +129,37 @@ public:
 
             // --- DOUBLE BUFFERING SETUP ---
             HDC hdcMem = CreateCompatibleDC(hdcScreen);
+            if (!hdcMem)
+            {
+                ReleaseDC(hTargetWnd, hdcScreen);
+                return;
+            }
+
             HBITMAP hBmpMem = CreateCompatibleBitmap(hdcScreen, stripWidth, stripHeight);
+            if (!hBmpMem)
+            {
+                DeleteDC(hdcMem);
+                ReleaseDC(hTargetWnd, hdcScreen);
+                return;
+            }
+
             HBITMAP hBmpOld = (HBITMAP)SelectObject(hdcMem, hBmpMem);
+            if (!hBmpOld || hBmpOld == HGDI_ERROR)
+            {
+                DeleteObject(hBmpMem);
+                DeleteDC(hdcMem);
+                ReleaseDC(hTargetWnd, hdcScreen);
+                return;
+            }
 
             // --- BASE CANVAS ---
             RECT rcMemStrip = { 0, 0, stripWidth, stripHeight };
             HBRUSH hDarkBrush = CreateSolidBrush(RGB(30, 30, 30));
-            FillRect(hdcMem, &rcMemStrip, hDarkBrush);
-            DeleteObject(hDarkBrush);
+            if (hDarkBrush)
+            {
+                FillRect(hdcMem, &rcMemStrip, hDarkBrush);
+                DeleteObject(hDarkBrush);
+            }
 
             // --- RENDER STRUCTURAL ELEMENTS & HOVER TILES FIRST ---
             HMENU hMenu = GetMenu(hTargetWnd);
@@ -147,15 +171,16 @@ public:
                 // --- DPI-AWARE DYNAMIC SYSTEM FONT LOOKUP ---
                 NONCLIENTMETRICS ncm = { 0 };
                 ncm.cbSize = sizeof(NONCLIENTMETRICS);
-                HFONT hFont = NULL;
+                HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+                bool ownsFont = false;
 
                 if (::SystemParametersInfoForDpi(SPI_GETNONCLIENTMETRICS, sizeof(NONCLIENTMETRICS), &ncm, 0, dpi))
                 {
-                    hFont = CreateFontIndirect(&ncm.lfMenuFont); // Fetches clean, DPI-scaled system menu font
-                }
-                else
-                {
-                    hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT); // Fallback
+                    if (HFONT dpiMenuFont = CreateFontIndirect(&ncm.lfMenuFont))
+                    {
+                        hFont = dpiMenuFont;
+                        ownsFont = true;
+                    }
                 }
 
                 HFONT hOldFont = (HFONT)SelectObject(hdcMem, hFont);
@@ -180,7 +205,8 @@ public:
 
                         if (i == activeHoverIdx)
                         {
-                            FillRect(hdcMem, &rcTextSlot, hHoverBrush);
+                            if (hHoverBrush)
+                                FillRect(hdcMem, &rcTextSlot, hHoverBrush);
                             SetTextColor(hdcMem, RGB(255, 255, 255));
                         }
                         else
@@ -192,10 +218,12 @@ public:
                     }
                 }
 
-                DeleteObject(hHoverBrush);
-                SelectObject(hdcMem, hOldFont);
+                if (hHoverBrush)
+                    DeleteObject(hHoverBrush);
+                if (hOldFont && hOldFont != HGDI_ERROR)
+                    SelectObject(hdcMem, hOldFont);
 
-                if (hFont && hFont != GetStockObject(DEFAULT_GUI_FONT))
+                if (ownsFont)
                 {
                     DeleteObject(hFont);
                 }
@@ -247,6 +275,9 @@ public:
                     GetCursorPos(&pt);
 
                     HMENU hMenu = GetMenu(hWnd);
+                    if (!hMenu)
+                        return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+
                     int count = GetMenuItemCount(hMenu);
                     int newHoverIdx = -1;
 
@@ -280,9 +311,9 @@ public:
 
                 // Catch the explicit Non-Client Mouse Leave message
             case WM_NCMOUSELEAVE:
+                KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
                 if (currentHoverIdx != -1)
                 {
-                    KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
                     SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
                     PerformDarkMenuPaint(hWnd, -1);
                 }
@@ -318,22 +349,23 @@ public:
                 UINT uFlags = (UINT)HIWORD(wParam);
                 HMENU hMenu = (HMENU)lParam;
 
-                if (!(uFlags & MF_SYSMENU) && hMenu == GetMenu(hWnd))
+                // A closed menu sends the documented no-selection sentinel.
+                if (hMenu == nullptr && uItem == 0xFFFF && uFlags == 0xFFFF)
                 {
-                    int activeIdx = -1;
-                    int count = GetMenuItemCount(hMenu);
-                    for (int i = 0; i < count; i++)
+                    if (currentHoverIdx != -1)
                     {
-                        if (GetSubMenu(hMenu, i) == (HMENU)uItem || i == (int)uItem)
-                        {
-                            activeIdx = i;
-                            break;
-                        }
+                        SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
+                        PerformDarkMenuPaint(hWnd, -1);
                     }
-                    if (activeIdx != -1)
+                }
+                else if (!(uFlags & MF_SYSMENU) && (uFlags & MF_POPUP) && hMenu == GetMenu(hWnd))
+                {
+                    int count = GetMenuItemCount(hMenu);
+                    // For MF_POPUP, LOWORD(wParam) is the top-level menu index.
+                    if (uItem < (UINT)count)
                     {
-                        SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)activeIdx);
-                        PerformDarkMenuPaint(hWnd, activeIdx);
+                        SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)uItem);
+                        PerformDarkMenuPaint(hWnd, (int)uItem);
                     }
                 }
                 return DefSubclassProc(hWnd, uMsg, wParam, lParam);
@@ -411,7 +443,7 @@ public:
     }
 
     // Set dialogs (model) with a dark title bar and apply icon
-    static void tryApplyTheme(HWND hwndTarget, LONG_PTR style)
+    static void tryApplyTheme(HWND hwndTarget)
     {
         TCHAR className[256];
         if (::GetClassName(hwndTarget, className, 256) > 0)
@@ -429,7 +461,6 @@ public:
 
             if (hExistingIcon == NULL)
             {
-                ::SetWindowLongPtr(hwndTarget, GWL_STYLE, style | WS_POPUPWINDOW);
                 ::SendMessage(hwndTarget, WM_SETICON, ICON_SMALL, (LPARAM)m_hIcon);
             }
         }
@@ -445,7 +476,7 @@ public:
             {
                 LONG_PTR style = ::GetWindowLongPtr(pCwprs->hwnd, GWL_STYLE);
                 if (!(style & WS_CHILD))
-                    tryApplyTheme(pCwprs->hwnd, style);
+                    tryApplyTheme(pCwprs->hwnd);
             }
         }
         return ::CallNextHookEx(m_hMenuHook, nCode, wParam, lParam);
@@ -453,7 +484,8 @@ public:
 
     void InstallThemeHook()
     {
-        m_hMenuHook = SetWindowsHookEx(WH_CALLWNDPROCRET, MenuWindowHookProc, NULL, GetCurrentThreadId());
+        if (!m_hMenuHook)
+            m_hMenuHook = SetWindowsHookEx(WH_CALLWNDPROCRET, MenuWindowHookProc, NULL, GetCurrentThreadId());
     }
 
     virtual void RegisterServerComponents()
