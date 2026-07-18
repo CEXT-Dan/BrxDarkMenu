@@ -31,6 +31,11 @@ constexpr const UINT MENU_LEAVE_TIMER_DELAY_MS = 20;
 constexpr const UINT_PTR MENU_SUBCLASS_ID = 1;
 constexpr const int MENU_UNHOVER_PENDING = -2;
 
+#ifndef WM_UAHDRAWMENU
+#define WM_UAHDRAWMENU       0x0091
+#define WM_UAHDRAWMENUITEM   0x0092
+#endif
+
 class BrxDarkMode : public AcRxArxApp
 {
     inline static HHOOK m_hMenuHook = nullptr;
@@ -263,13 +268,36 @@ public:
             case WM_ERASEBKGND:
                 return TRUE;
 
+                // 1. Trap the core non-client paint routes completely
             case WM_NCPAINT:
             case WM_NCACTIVATE:
             {
+                // Execute the base frame layout (borders, drop shadows, minimize/maximize buttons)
                 LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
-                // Do not bypass a pending delayed unhover repaint.
+
+                // CRITICAL FIX: Immediately paint your dark menu over the white asset 
+                // before the graphics card flushes the frame buffer to the monitor.
                 if (currentHoverIdx != MENU_UNHOVER_PENDING)
+                {
                     PerformDarkMenuPaint(hWnd, currentHoverIdx);
+                }
+                return res;
+            }
+
+            case WM_UPDATEUISTATE:
+            case WM_UAHDRAWMENU:
+            case WM_UAHDRAWMENUITEM:
+            case 0x0125: // Internal legacy system menu paint ticker
+            {
+                LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
+                PerformDarkMenuPaint(hWnd, currentHoverIdx);
+                return res;
+            }
+
+            case WM_INITMENUPOPUP:
+            {
+                LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
+                PerformDarkMenuPaint(hWnd, currentHoverIdx);
                 return res;
             }
 
@@ -301,7 +329,6 @@ public:
                         }
                     }
 
-                    // If the hover state shifted, update layout variables
                     if (newHoverIdx != currentHoverIdx)
                     {
                         SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)newHoverIdx);
@@ -311,8 +338,8 @@ public:
                     SetTimer(hWnd, MENU_LEAVE_TIMER_ID, MENU_LEAVE_TIMER_DELAY_MS, NULL);
                     return 0;
                 }
+                break; // Standard non-client moves must continue down to DefSubclassProc
 
-                // Catch the explicit Non-Client Mouse Leave message
             case WM_NCMOUSELEAVE:
                 KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
                 if (currentHoverIdx != -1 && currentHoverIdx != MENU_UNHOVER_PENDING)
@@ -331,7 +358,6 @@ public:
                     LRESULT hitTest = DefSubclassProc(hWnd, WM_NCHITTEST, 0, MAKELPARAM(pt.x, pt.y));
                     if (hitTest != HTMENU)
                     {
-                        // The mouse is gone! Turn off the timer loop immediately to save CPU cycles
                         KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
 
                         if (currentHoverIdx != -1 && currentHoverIdx != MENU_UNHOVER_PENDING)
@@ -415,6 +441,7 @@ public:
         }
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
+
 
     static void InitializeDarkMenuBar()
     {
