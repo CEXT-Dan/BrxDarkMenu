@@ -472,6 +472,7 @@ public:
                 SetWindowSubclass(hMainWnd, DarkMenuBarSubclassProc, MENU_SUBCLASS_ID, (DWORD_PTR)-1);
 
                 // Force a total window repaint to trigger the new paint sequence instantly
+                // Not needed if this module loads on start
                 SetWindowPos(hMainWnd, NULL, 0, 0, 0, 0,
                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
