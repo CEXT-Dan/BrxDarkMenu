@@ -284,12 +284,11 @@ public:
             }
 
             case WM_UAHDRAWMENU:
-            case WM_UAHDRAWMENUITEM:
-            {
-                LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
                 PerformDarkMenuPaint(hWnd, currentHoverIdx);
-                return res;
-            }
+                return 0;  // Do not let the native light menu draw.
+
+            case WM_UAHDRAWMENUITEM:
+                return 0;  // The full custom paint above draws all menu text/items.
 
             case WM_INITMENUPOPUP:
             {
@@ -420,9 +419,13 @@ public:
             case WM_SETCURSOR:
                 if (LOWORD(lParam) == HTMENU)
                 {
-                    TRACKMOUSEEVENT tme = { sizeof(TRACKMOUSEEVENT), TME_LEAVE | TME_NONCLIENT, hWnd, HOVER_DEFAULT };
+                    TRACKMOUSEEVENT tme = {
+                        sizeof(TRACKMOUSEEVENT),
+                        TME_LEAVE | TME_NONCLIENT,
+                        hWnd,
+                        HOVER_DEFAULT
+                    };
                     TrackMouseEvent(&tme);
-                    PerformDarkMenuPaint(hWnd, currentHoverIdx);
                     return TRUE;
                 }
                 break;
