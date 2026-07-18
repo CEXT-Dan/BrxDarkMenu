@@ -24,7 +24,7 @@
 #include "dwmapi.h"
 
 constexpr const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_I20 = 20; //dark
-constexpr const UINT_PTR MENU_LEAVE_TIMER_ID = 4242; 
+constexpr const UINT_PTR MENU_LEAVE_TIMER_ID = 4242;
 constexpr const UINT_PTR MENU_UNHOVER_TIMER_ID = 4243;
 constexpr const UINT MENU_UNHOVER_DELAY_MS = 60;
 constexpr const UINT MENU_LEAVE_TIMER_DELAY_MS = 20;
@@ -268,14 +268,13 @@ public:
             case WM_ERASEBKGND:
                 return TRUE;
 
-                // 1. Trap the core non-client paint routes completely
             case WM_NCPAINT:
             case WM_NCACTIVATE:
             {
                 // Execute the base frame layout (borders, drop shadows, minimize/maximize buttons)
                 LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
 
-                // CRITICAL FIX: Immediately paint your dark menu over the white asset 
+                // Immediately paint your dark menu over the white asset 
                 // before the graphics card flushes the frame buffer to the monitor.
                 if (currentHoverIdx != MENU_UNHOVER_PENDING)
                 {
@@ -284,10 +283,8 @@ public:
                 return res;
             }
 
-            case WM_UPDATEUISTATE:
             case WM_UAHDRAWMENU:
             case WM_UAHDRAWMENUITEM:
-            case 0x0125: // Internal legacy system menu paint ticker
             {
                 LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
                 PerformDarkMenuPaint(hWnd, currentHoverIdx);
@@ -441,7 +438,6 @@ public:
         }
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
-
 
     static void InitializeDarkMenuBar()
     {
