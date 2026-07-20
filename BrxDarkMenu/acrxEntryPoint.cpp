@@ -27,8 +27,6 @@
 // were the the fix. 
 
 constexpr const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_I20 = 20; //dark
-constexpr const UINT_PTR MENU_LEAVE_TIMER_ID = 4242;
-constexpr const UINT_PTR MENU_UNHOVER_TIMER_ID = 4243;
 constexpr const UINT MENU_UNHOVER_DELAY_MS = 60;
 constexpr const UINT MENU_LEAVE_TIMER_DELAY_MS = 20;
 constexpr const UINT_PTR MENU_SUBCLASS_ID = 1;
@@ -269,8 +267,9 @@ public:
         switch (uMsg)
         {
             case WM_ERASEBKGND:
+            {
                 return TRUE;
-
+            }
             case WM_NCPAINT:
             case WM_NCACTIVATE:
             {
@@ -285,26 +284,25 @@ public:
                 }
                 return res;
             }
-
             case WM_UAHDRAWMENU:
+            {
                 PerformDarkMenuPaint(hWnd, currentHoverIdx);
                 return 0;  // Do not let the native light menu draw.
-
+            }
             case WM_UAHDRAWMENUITEM:
+            {
                 return 0;  // The full custom paint above draws all menu text/items.
-
+            }
             case WM_INITMENUPOPUP:
             {
                 LRESULT res = DefSubclassProc(hWnd, uMsg, wParam, lParam);
                 PerformDarkMenuPaint(hWnd, currentHoverIdx);
                 return res;
             }
-
             case WM_NCMOUSEMOVE:
+            {
                 if (wParam == HTMENU)
                 {
-                    KillTimer(hWnd, MENU_UNHOVER_TIMER_ID);
-
                     POINT pt;
                     GetCursorPos(&pt);
 
@@ -327,62 +325,15 @@ public:
                             }
                         }
                     }
-
                     if (newHoverIdx != currentHoverIdx)
                     {
                         SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)newHoverIdx);
                         PerformDarkMenuPaint(hWnd, newHoverIdx);
                     }
-
-                    SetTimer(hWnd, MENU_LEAVE_TIMER_ID, MENU_LEAVE_TIMER_DELAY_MS, NULL);
                     return 0;
                 }
                 break; // Standard non-client moves must continue down to DefSubclassProc
-
-            case WM_NCMOUSELEAVE:
-                KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
-                if (currentHoverIdx != -1 && currentHoverIdx != MENU_UNHOVER_PENDING)
-                {
-                    SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)MENU_UNHOVER_PENDING);
-                    SetTimer(hWnd, MENU_UNHOVER_TIMER_ID, MENU_UNHOVER_DELAY_MS, NULL);
-                }
-                break;
-
-            case WM_TIMER:
-                if (wParam == MENU_LEAVE_TIMER_ID)
-                {
-                    POINT pt;
-                    GetCursorPos(&pt);
-
-                    LRESULT hitTest = DefSubclassProc(hWnd, WM_NCHITTEST, 0, MAKELPARAM(pt.x, pt.y));
-                    if (hitTest != HTMENU)
-                    {
-                        KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
-
-                        if (currentHoverIdx != -1 && currentHoverIdx != MENU_UNHOVER_PENDING)
-                        {
-                            SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)MENU_UNHOVER_PENDING);
-                            SetTimer(hWnd, MENU_UNHOVER_TIMER_ID, MENU_UNHOVER_DELAY_MS, NULL);
-                        }
-                    }
-                    return 0;
-                }
-                if (wParam == MENU_UNHOVER_TIMER_ID)
-                {
-                    KillTimer(hWnd, MENU_UNHOVER_TIMER_ID);
-
-                    POINT pt;
-                    GetCursorPos(&pt);
-                    LRESULT hitTest = DefSubclassProc(hWnd, WM_NCHITTEST, 0, MAKELPARAM(pt.x, pt.y));
-                    if (hitTest != HTMENU)
-                    {
-                        SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
-                        PerformDarkMenuPaint(hWnd, -1);
-                    }
-                    return 0;
-                }
-                break;
-
+            }
             case WM_MENUSELECT:
             {
                 UINT uItem = (UINT)LOWORD(wParam);
@@ -407,19 +358,19 @@ public:
                 }
                 return DefSubclassProc(hWnd, uMsg, wParam, lParam);
             }
-
             case WM_ENTERMENULOOP:
+            {
                 PerformDarkMenuPaint(hWnd, currentHoverIdx);
                 return DefSubclassProc(hWnd, uMsg, wParam, lParam);
-
+            }
             case WM_EXITMENULOOP:
-                KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
-                KillTimer(hWnd, MENU_UNHOVER_TIMER_ID);
+            {
                 SetWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass, (DWORD_PTR)-1);
                 PerformDarkMenuPaint(hWnd, -1);
                 return DefSubclassProc(hWnd, uMsg, wParam, lParam);
-
+            }
             case WM_SETCURSOR:
+            {
                 if (LOWORD(lParam) == HTMENU)
                 {
                     TRACKMOUSEEVENT tme = {
@@ -432,15 +383,16 @@ public:
                     return TRUE;
                 }
                 break;
-
+            }
             case WM_NCHITTEST:
+            {
                 return DefSubclassProc(hWnd, uMsg, wParam, lParam);
-
+            }
             case WM_NCDESTROY:
-                KillTimer(hWnd, MENU_LEAVE_TIMER_ID);
-                KillTimer(hWnd, MENU_UNHOVER_TIMER_ID);
+            {
                 RemoveWindowSubclass(hWnd, DarkMenuBarSubclassProc, uIdSubclass);
                 break;
+            }
         }
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
