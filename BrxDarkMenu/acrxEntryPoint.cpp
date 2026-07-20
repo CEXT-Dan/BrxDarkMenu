@@ -23,12 +23,7 @@
 #include "resource.h"
 #include "dwmapi.h"
 
-// I think we can lose the timers, they helped but WM_UAHDRAWMENU and WM_UAHDRAWMENUITEM
-// were the the fix. 
-
 constexpr const DWORD DWMWA_USE_IMMERSIVE_DARK_MODE_I20 = 20; //dark
-constexpr const UINT MENU_UNHOVER_DELAY_MS = 60;
-constexpr const UINT MENU_LEAVE_TIMER_DELAY_MS = 20;
 constexpr const UINT_PTR MENU_SUBCLASS_ID = 1;
 constexpr const int MENU_UNHOVER_PENDING = -2;
 
